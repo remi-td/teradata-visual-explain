@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXPLAIN Analysis: SELECT * FROM DBC.COLUMNSV</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --td-orange: #FF5F02;
+  --td-navy: #00233C;
+  --td-white: #FFFFFF;
+  --color-critical: #C0392B;
+  --color-warning: #FF5F02;
+  --color-good: #27AE60;
+  --color-info: #4A90E2;
+  --color-special: #00233C;
+  --color-text: #00233C;
+  --color-text-light: #6B7A8D;
+  --color-bg: #F5F7FA;
+  --color-bg-card: #FFFFFF;
+  --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-family); background: var(--color-bg); color: var(--color-text); }
+
+.td-header {
+  background: var(--td-navy);
+  padding: 16px 30px;
+  display: flex; align-items: center; gap: 16px;
+  border-bottom: 3px solid var(--td-orange);
+}
+.td-header img { height: 32px; filter: brightness(0) invert(1); }
+.td-header-title { color: #fff; font-weight: 600; font-size: 18px; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 30px; }
+
+h2, h3 { color: var(--td-navy); font-weight: 600; }
+
+/* Query box */
+.query-box {
+  background: var(--td-navy); color: #E8F4FD;
+  padding: 16px 20px; border-radius: 8px; font-family: 'Fira Code', monospace;
+  font-size: 14px; margin-bottom: 24px; border-left: 4px solid var(--td-orange);
+}
+
+/* Summary cards */
+.summary-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px; margin-bottom: 24px;
+}
+.summary-card {
+  background: #fff; border-radius: 10px; padding: 18px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07); text-align: center;
+  border-top: 4px solid var(--td-navy);
+}
+.summary-card.critical { border-top-color: var(--color-critical); }
+.summary-card.warning  { border-top-color: var(--color-warning);  }
+.summary-card.good     { border-top-color: var(--color-good);     }
+.summary-card.info     { border-top-color: var(--color-info);     }
+.card-value { font-size: 28px; font-weight: 700; color: var(--td-navy); }
+.card-label { font-size: 12px; color: var(--color-text-light); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* Legend */
+.legend {
+  display: flex; flex-wrap: wrap; gap: 12px;
+  background: #fff; padding: 14px 20px; border-radius: 8px;
+  margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.legend-dot { width: 14px; height: 14px; border-radius: 3px; }
+
+/* Controls */
+.controls {
+  display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 28px;
+}
+.btn {
+  padding: 8px 18px; border: none; border-radius: 6px; cursor: pointer;
+  font-family: var(--font-family); font-size: 13px; font-weight: 500;
+  transition: all 0.2s ease;
+}
+.btn-critical { background: var(--color-critical); color: #fff; }
+.btn-warning  { background: var(--color-warning);  color: #fff; }
+.btn-reset    { background: var(--td-navy); color: #fff; }
+.btn:hover { opacity: 0.85; transform: translateY(-1px); }
+
+/* Flow diagram */
+.flow-diagram {
+  background: #EEF1F5; padding: 30px; border-radius: 12px;
+  overflow-x: auto; margin-bottom: 30px;
+}
+.flow-container {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 0; min-width: 900px;
+}
+
+/* Nodes */
+.flow-node {
+  background: #fff; border-radius: 10px; padding: 14px 18px;
+  width: 480px; border: 3px solid #ccc;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.09);
+  transition: all 0.3s ease; cursor: pointer; position: relative;
+}
+.flow-node:hover { transform: translateY(-3px) scale(1.01); box-shadow: 0 8px 20px rgba(0,0,0,0.18); z-index: 10; }
+.flow-node.good     { border-color: var(--color-good); }
+.flow-node.warning  { border-color: var(--color-warning); }
+.flow-node.critical { border-color: var(--color-critical); }
+.flow-node.info     { border-color: var(--color-info); }
+.flow-node.special  { border-color: var(--td-navy); background: #F0F4F8; }
+
+.node-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap;
+}
+.node-step {
+  background: #6C3FC5; color: #fff;
+  padding: 2px 9px; border-radius: 10px; font-size: 11px; font-weight: 700;
+}
+.node-type {
+  background: #E8EAF0; color: #444;
+  padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600;
+  font-family: monospace;
+}
+.confidence-badge {
+  padding: 2px 9px; border-radius: 10px; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.04em; margin-left: auto;
+}
+.confidence-badge.high { background: var(--color-good); color: #fff; }
+.confidence-badge.low  { background: var(--color-warning); color: #fff; }
+.confidence-badge.none { background: var(--color-critical); color: #fff; }
+.confidence-badge.n-a  { background: #9E9E9E; color: #fff; }
+
+.node-title { font-weight: 600; font-size: 13px; color: var(--td-navy); margin-bottom: 8px; }
+
+.node-metrics {
+  display: flex; flex-wrap: wrap; gap: 10px;
+}
+.node-metric {
+  display: flex; flex-direction: column; min-width: 80px;
+}
+.node-metric-label { font-size: 10px; color: var(--color-text-light); text-transform: uppercase; }
+.node-metric-value { font-size: 12px; font-weight: 600; color: var(--td-navy); }
+
+.product-join-badge {
+  background: var(--color-critical); color: #fff;
+  padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;
+  margin-top: 8px; display: inline-block;
+}
+
+/* Tooltip */
+.tooltip {
+  display: none; position: absolute; left: 105%; top: 0;
+  background: #1a2740; color: #e8edf5;
+  padding: 14px 16px; border-radius: 8px; width: 340px;
+  font-size: 12px; line-height: 1.6; z-index: 100;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  border-left: 3px solid var(--td-orange);
+}
+.tooltip strong { color: var(--td-orange); }
+.flow-node:hover .tooltip { display: block; }
+
+/* Arrows */
+.flow-arrow {
+  display: flex; flex-direction: column; align-items: center; margin: 6px 0;
+}
+.arrow-line {
+  width: 3px; height: 28px;
+  background: linear-gradient(180deg, #9AAABB, #6B8099);
+}
+.arrow-head {
+  width: 0; height: 0;
+  border-left: 8px solid transparent; border-right: 8px solid transparent;
+  border-top: 10px solid #6B8099;
+}
+.arrow-spool {
+  font-size: 11px; color: #555; background: #fff;
+  padding: 2px 10px; border-radius: 10px; margin: 4px 0;
+  border: 1px solid #ddd; font-family: monospace;
+}
+
+/* Parallel */
+.parallel-marker {
+  background: var(--td-navy); color: #fff;
+  padding: 6px 18px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  margin: 8px 0;
+}
+.parallel-row {
+  display: flex; align-items: flex-start; gap: 20px; justify-content: center;
+  flex-wrap: wrap;
+}
+.parallel-row .flow-node { width: 360px; }
+.parallel-row .flow-node .tooltip { left: auto; right: 105%; }
+
+/* Insights */
+.insights-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.insight-card {
+  background: #fff; border-radius: 10px; padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+}
+.insight-card h3 { font-size: 14px; margin-bottom: 12px; }
+.insight-item {
+  display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid #EEF1F5;
+  font-size: 13px;
+}
+.insight-item:last-child { border-bottom: none; }
+.insight-rank { font-weight: 700; color: var(--td-orange); min-width: 20px; }
+
+/* Time bar */
+.time-bar-wrap { margin-top: 4px; }
+.time-bar-bg { background: #EEF1F5; border-radius: 4px; height: 8px; overflow: hidden; }
+.time-bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+.time-bar-fill.critical { background: var(--color-critical); }
+.time-bar-fill.warning  { background: var(--color-warning); }
+.time-bar-fill.good     { background: var(--color-good); }
+.time-bar-fill.info     { background: var(--color-info); }
+.time-pct { font-size: 10px; color: var(--color-text-light); margin-top: 2px; }
+
+/* Recommendations */
+.rec-section { margin-top: 30px; }
+.rec-card {
+  background: #fff; border-radius: 10px; padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07); margin-bottom: 14px;
+  border-left: 5px solid #ccc;
+}
+.rec-card.critical { border-left-color: var(--color-critical); }
+.rec-card.warning  { border-left-color: var(--color-warning); }
+.rec-card.info     { border-left-color: var(--color-info); }
+.rec-title { font-weight: 700; font-size: 14px; margin-bottom: 6px; color: var(--td-navy); }
+.rec-body  { font-size: 13px; color: #444; line-height: 1.6; }
+pre.sql-snippet {
+  background: #1E2D40; color: #A8D8EA;
+  padding: 12px 16px; border-radius: 6px; font-size: 12px;
+  font-family: 'Fira Code', monospace; margin-top: 10px;
+  overflow-x: auto;
+}
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-right: 6px; }
+.tag.critical { background: #FDECEA; color: var(--color-critical); }
+.tag.warning  { background: #FFF3E0; color: #E65100; }
+.tag.info     { background: #E3F2FD; color: #1565C0; }
+
+.section-header { font-size: 16px; font-weight: 700; color: var(--td-navy); margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid var(--td-orange); }
+
+/* highlight states */
+.flow-node.dimmed { opacity: 0.35; }
+.flow-node.highlighted { box-shadow: 0 0 0 4px rgba(192,57,43,0.55), 0 6px 20px rgba(0,0,0,0.22) !important; transform: scale(1.03) !important; }
+</style>
+</head>
+<body>
+
+<div class="td-header">
+  <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABVCAMAAADOrBLEAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAGbUExURf9fAgAAAP9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv9fAv///3jJeXQAAACHdFJOUwAA4/Lx9HV8gggMBOHDxL0090PNnJ6YKgGB7pTktAfU3SD8YJ3GGf4QSfOtNgYDHk50g39kIdnqrlFBPT48I4na+u+4Uqr79vXtQNKTFGegDyfRd4jeMDkd2JBL+M4ib+nwUwJK0CbimQXoLna8ax8KK1iGyutCwS0sOkRMTRXnjBwW5ciKNyCa7VMAAAABYktHRIhrZhZaAAAACXBIWXMAAC4jAAAuIwF4pT92AAAAB3RJTUUH6gIDDSMcsQ7WtwAAAeNJREFUWMPt1tlbElEYBvCXMEhGssVwynIBCxBEMXQKynBDMAoqSElt0bKgXFpt07LM+bcdRpiGc0jOuaini/Nezjfze76zAo5Ym2py1AYLT9CkErELQAAC+E+AY80OOhLYgRYnleOtJziAejl5SgACEMC/B063naHiaucA7JDrhAuw8EQAAhCAAAQggL8MnAWXgHMk0MEJnCeBC518QBcJdPfwAa0k4PZwjQG9JKBevMQF2Lwk4HX5OHqAv49qwR0I9v+ZQGhgMDx0ORJ06O9geESlo1wJX43Grhm57qt6wOiN+Fi5z/GJyWbtKfqn1LpJTCd/JzVTASD7bxqvJNO3oOW22jjVv3mA37xvvJmsBtxp4QBG79bO1j0ZCLmYAcg5opC/r7UwqzADcwWykoO2LA+YgfkFsrJYXoiHi2wA8IiqWKFP7WNGwE5VvHpBjjxhA8JUZfpgbFJEYQAsWEqQlUJlfZefPmMBVp6TlRcwtnhHqjEgkYdfiRqHDsVYptQIQJC4AdNF06lF8eWr1ZL7EECb7rWk+blzvfbYAxuv37wNvMu/71sYS5hi/VAdaqfNtGCbH0HfG5Cl7MCnz1++bpkyv23cB9Kgs7Idv33f0T7n+xnSu/zhCcSVn7u/9vTx7wNeLG/Yd2GbHAAAAABJRU5ErkJggg==" alt="Teradata">
+  <span class="td-header-title">Query Execution Plan Analysis — DBC.COLUMNSV</span>
+</div>
+
+<div class="container">
+
+  <!-- Query -->
+  <div class="query-box">SELECT * FROM DBC.COLUMNSV;</div>
+
+  <!-- Summary -->
+  <div class="summary-grid">
+    <div class="summary-card critical">
+      <div class="card-value">2</div>
+      <div class="card-label">⚠ Product Joins</div>
+    </div>
+    <div class="summary-card critical">
+      <div class="card-value">8</div>
+      <div class="card-label">No-Confidence Steps</div>
+    </div>
+    <div class="summary-card warning">
+      <div class="card-value">2.64s</div>
+      <div class="card-label">Total Est. Time</div>
+    </div>
+    <div class="summary-card warning">
+      <div class="card-value">~597 MB</div>
+      <div class="card-label">Peak Spool (Spool 1)</div>
+    </div>
+    <div class="summary-card info">
+      <div class="card-value">13</div>
+      <div class="card-label">Execution Steps</div>
+    </div>
+    <div class="summary-card good">
+      <div class="card-value">27,851</div>
+      <div class="card-label">Est. Rows Returned</div>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--color-critical)"></div> Critical (product join / no confidence)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--color-warning)"></div> Warning (low confidence / moderate cost)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--color-good)"></div> Good (high confidence / fast)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--color-info)"></div> Info (locks / output)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--td-navy)"></div> Special (parallel markers)</div>
+    <div class="legend-item">🔴 <strong>PROD-J</strong> = Product Join (Cartesian risk)</div>
+    <div class="legend-item">💡 Hover over any step for details</div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn btn-critical" onclick="highlightCriticalPath()">🔥 Highlight Critical Path</button>
+    <button class="btn btn-warning" onclick="highlightProductJoins()">⚠ Highlight Product Joins</button>
+    <button class="btn btn-warning" onclick="highlightNoConf()">📊 Highlight No-Confidence</button>
+    <button class="btn btn-reset" onclick="resetHighlights()">↺ Reset</button>
+  </div>
+
+  <!-- Flow Diagram -->
+  <div class="section-header">Interactive Execution Flow</div>
+  <div class="flow-diagram">
+    <div class="flow-container">
+
+      <!-- Locks -->
+      <div class="flow-node info" data-step="1-2" data-type="lock">
+        <div class="node-header">
+          <div class="node-step">Steps 1–2</div>
+          <div class="node-type">[LOCK]</div>
+          <div class="confidence-badge n-a">N/A</div>
+        </div>
+        <div class="node-title">Lock Acquisition — 6 DBC Tables</div>
+        <div class="node-metrics">
+          <div class="node-metric"><span class="node-metric-label">Tables Locked</span><span class="node-metric-value">6</span></div>
+          <div class="node-metric"><span class="node-metric-label">Lock Types</span><span class="node-metric-value">ACCESS / READ</span></div>
+          <div class="node-metric"><span class="node-metric-label">Time</span><span class="node-metric-value">~0.00s</span></div>
+          <div class="node-metric"><span class="node-metric-label">Deadlock Guard</span><span class="node-metric-value">Reserved RowHash</span></div>
+        </div>
+        <div class="tooltip">
+          <strong>Purpose:</strong> Acquire locks on all DBC dictionary tables referenced by COLUMNSV before any data access.<br><br>
+          <strong>Tables:</strong> DBC.udt1, DBC.tvfields, DBC.TVM, DBC.dbase, DBC.dsc, DBC.OU<br><br>
+          <strong>RowHash Lock:</strong> Reserved RowHash on DBC.udt1 prevents global deadlock — standard practice for dictionary views.<br><br>
+          <strong>Impact:</strong> Low — lock acquisition is fast. However, concurrent DDL may be blocked during this query.
+        </div>
+      </div>
+
+      <div class="flow-arrow"><div class="arrow-line"></div><div class="arrow-head"></div></div>
+
+      <!-- Parallel block -->
+      <div class="parallel-marker">◆ PARALLEL EXECUTION (Step 3 — 3 sub-steps run simultaneously)</div>
+
+      <div class="parallel-row">
+        <!-- 3.1 dbase -->
+        <div class="flow-node good" data-step="3.1" data-type="retrieve" data-time="0">
+          <div class="node-header">
+            <div class="node-step">Step 3.1</div>
+            <div class="node-type">[ALL-AMP]</div>
+            <div class="confidence-badge high">HIGH</div>
+          </div>
+          <div class="node-title">Retrieve DBC.dbase → Spool 2</div>
+          <div class="node-metrics">
+            <div class="node-metric"><span class="node-metric-label">Rows</span><span class="node-metric-value">200</span></div>
+            <div class="node-metric"><span class="node-metric-label">Size</span><span class="node-metric-value">38 KB</span></div>
+            <div class="node-metric"><span class="node-metric-label">Time</span><span class="node-metric-value">0.00s</span></div>
+            <div class="node-metric"><span class="node-metric-label">Method</span><span class="node-metric-value">Dup all AMPs</span></div>
+          </div>
+          <div class="tooltip">
+            <strong>Purpose:</strong> Read the DBC.dbase (database dictionary) table and broadcast to all AMPs.<br><br>
+            <strong>Access:</strong> All-rows scan — no predicate filtering, full table read.<br><br>
+            <strong>Duplication:</strong> "duplicated on all AMPs" = broadcast pattern. Small table (200 rows) makes this efficient.<br><br>
+            <strong>Reuse:</strong> Spool 2 is reused in Steps 6, 7, 9 — good optimizer decision to build once, reuse multiple times.<br><br>
+            <strong>✅ Status:</strong> Well-optimized for its role.
+          </div>
+        </div>
+
+        <!-- 3.2 dsc -->
+        <div class="flow-node warning" data-step="3.2" data-type="retrieve" data-time="0">
+          <div class="node-header">
+            <div class="node-step">Step 3.2</div>
+            <div class="node-type">[ALL-AMP]</div>
+            <div class="confidence-badge low">LOW</div>
+          </div>
+          <div class="node-title">Retrieve DBC.dsc → Spool 3</div>
+          <div class="node-metrics">
+            <div class="node-metric"><span class="node-metric-label">Rows</span><span class="node-metric-value">16</span></div>
+            <div class="node-metric"><span class="node-metric-label">Size</span><span class="node-metric-value">1.7 KB</span></div>
+            <div class="node-metric"><span class="node-metric-label">Time</span><span class="node-metric-value">0.00s</span></div>
+            <div class="node-metric"><span class="node-metric-label">Method</span><span class="node-metric-value">Dup all AMPs</span></div>
+          </div>
+          <div class="tooltip">
+            <strong>Purpose:</strong> Read DBC.dsc (dataset schema) and broadcast to all AMPs.<br><br>
+            <strong>⚠ Low Confidence:</strong> Optimizer lacks full statistics on DBC.dsc. Only 16 rows estimated — likely accurate but unverifiable.<br><br>
+            <strong>Access:</strong> All-rows scan, duplicated (broadcast). Very small table, so this is fine regardless.<br><br>
+            <strong>Recommendation:</strong> No action needed — table is internal and small.
+          </div>
+        </div>
+
+        <!-- 3.3 OU -->
+        <div class="flow-node critical" data-step="3.3" data-type="retrieve" data-time="0">
+          <div class="node-header">
+            <div class="node-step">Step 3.3</div>
+            <div class="node-type">[ALL-AMP]</div>
+            <div class="confidence-badge none">NONE</div>
+          </div>
+          <div class="node-title">Retrieve DBC.OU → Spool 4</div>
+          <div class="node-metrics">
+            <div class="node-metric"><span class="node-metric-label">Rows</span><span class="node-metric-value">~1</span></div>
+            <div class="node-metric"><span class="node-metric-label">Size</span><span class="node-metric-value">45 B</span></div>
+            <div class="node-metric"><span class="node-metric-label">Time</span><span class="node-metric-value">0.00s</span></div>
+            <div class="node-metric"><span class="node-metric-label">Method</span><span class="node-metric-value">Redist by ObjectId</span></div>
+          </div>
+          <div class="tooltip">
+            <strong>Purpose:</strong> Retrieve rows from DBC.OU with filter: FieldId NOT NULL AND IndexNumber IS NULL AND UsageType='DML'.<br><br>
+            <strong>🔴 No Confidence:</strong> No statistics on DBC.OU — optimizer is guessing the cardinality is 1 row.<br><br>
+            <strong>Redistribution:</strong> Rows redistributed by hash of ObjectId into 50 hash-join partitions for downstream join.<br><br>
+            <strong>Risk:</strong> If actual row count is much higher than 1, downstream joins (Steps 4,5) may be severely under-resourced.<br><br>
+            <strong>Recommendation:</strong> Monitor this step; DBC.OU is internal and cannot be user-statted.
+          </div>
+        </div>
+      </div>
+
+      <div class="parallel-marker">◆ PARALLEL EXECUTION COMPLETE — outputs: Spool 2, Spool 3, Spool 4</div>
+
+      <div class="flow-arrow"><div class="arrow-line"></div><div class="arrow-spool">Spool 3 (16 rows) + DBC.tvfields → Spool 5</div><div class="arrow-head"></div></div>
+
+      <!-- Step 4 -->
+      <div class="flow-node critical" data-step="4" data-type="join" data-time="0.23">
+        <div class="node-header">
+          <div class="node-step">Step 4</div>
+          <div class="node-type">[DYN-J RIGHT-OUTER]</div>
+          <div class="confidence-badge none">NONE</div>
+        </div>
+        <div class="node-title">Dynamic Hash Join: Spool 3 ⟕ DBC.tvfields → Spool 5</div>
+        <div class="node-metrics">
+          <div class="node-metric"><span class="node-metric-label">Rows Out</span><span class="node-metric-value">27,849</span></div>
+          <div class="node-metric"><span class="node-metric-label">Size</span><span class="node-metric-value">~347 MB</span></div>
+          <div class="node-metric"><span class="node-metric-label">Time</span><span class="node-metric-value">0.23s (8.7%)</span></div>
+          <div class="node-metric"><span class="node-metric-label">Partitions</span><span class="node-metric-value">50 hash parts</span></div>
+        </div>
+        <div class="time-bar-wrap"><div class="time-bar-bg"><div class="time-bar-fill critical" style="width:8.7%"></div></div><div class="time-pct">8.7% of total</div></div>
+        <div class="tooltip">
+          <strong>Purpose:</strong> Right outer join DBC.dsc (Spool 3) to DBC.tvfields on DatasetSchemaId. Keeps all tvfields rows.<br><br>
+          <strong>Filter on tvfields:</strong> TSColumnType NOT IN ('TB') OR TSColumnType IS NULL<br><br>
+          <strong>Non-match condition:</strong> FieldType='DT' AND DatasetSchemaId NOT NULL (for unmatched right-side rows).<br><br>
+          <strong>🔴 No Confidence:</strong> Optimizer has no statistics to estimate the join result size (27,849 rows guessed).<br><br>
+          <strong>⚠ Large Spool:</strong> 347 MB intermediate result — this is the core column catalog data.<br><br>
+          <strong>Note:</strong> Dynamic hash join is appropriate here given uncertainty about input sizes.
+        </div>
+      </div>
+
+      <div class="flow-arrow"><div class="arrow-line"></div><div class="arrow-spool">Spool 4 (1 row) + Spool 5 (27,849 rows) → Spool 9</div><div class="arrow-head"></div></div>
+
+      <!-- Step 5 -->
+      <div class="flow-node critical" data-step="5" data-type="join" data-time="0.23">
+        <div class="node-header">
+          <div class="node-step">Step 5</div>
+          <div class="node-type">[HASH-J RIGHT-OUTER]</div>
+          <div class="confidence-badge none">NONE</div>
+        </div>
+        <div class="node-title">Hash Join: Spool 4 ⟕ Spool 5 → Spool 9</div>
+        <div class="node-metrics">
+          <div class="node-metric"><span class="node-metric-label">Rows Out</span><span class="node-metric-value">27,849</span></div>
+          <div class="node-metric"><span class="node-metric-label">Size</span><span class="node-metric-value">~347 MB</span></div>
+          <div class="node-metric"><span class="node-metric-label">Time</span><span class="node-metric-value">0.23s (8.7%)</span></div>
+          <div class="node-metric"><span class="node-metric-label">Join Keys</span><span class="node-metric-value">DatabaseId, TableId, FieldId</span></div>
+        </div>
+        <div class="time-bar-wrap"><div class="time-bar-bg"><div class="time-bar-fill critical" style="width:8.7%"></div></div><div class="time-pct">8.7% of total</div></div>
+        <div class="tooltip">
+          <strong>Purpose:</strong> Join ObjUsage data (Spool 4) to field data (Spool 5) on DatabaseId + TableId + FieldId.<br><br>
+          <strong>Right outer join:</strong> All column records from Spool 5 are preserved regardless of match in Spool 4.<br><br>
+          <strong>🔴 No Confidence:</strong> Cascading from upstream no-confidence steps. Row count estimate unreliable.<br><br>
+          <strong>50 partitions:</strong> Hash join partitioned to manage memory — shows optimizer is treating this as a potentially large join.<br><br>
+          <strong>Performance:</strong> At 0.23s, this is within acceptable range for a data dictionary view.
+        </div>
+      </div>
+
+      <div class="flow-arrow"><div class="arrow-line"></div><div class="arrow-spool">Spool 2 (200 rows) + Spool 9 → Spool 13 — Join on CreateUID=DatabaseId</div><div class="arrow-head"></div></div>
+
+      <!-- Step 6 -->
+      <div class="flow-node critical" data-step="6" data-type="join" data-time="0.37">
+        <div class="node-header">
+          <div class="node-step">Step 6</div>
+          <div class="node-type">[HASH-J RIGHT-OUTER]</div>
+          <div class="confidence-badge none">NONE</div>
+        </div>
+        <div class="node-title">Hash Join: Spool 2 ⟕ Spool 9 → Spool 13 (Creator DB lookup)</div>
+        <div class="node-metrics">
+          <div class="node-metric"><span class="node-metric-label">Rows Out</span><span class="node-metric-value">27,849</span></div>
+          <div class="node-metric"><span class="node-metric-label">Size</span><span class="node-metric-value">~349 MB</span></div>
+          <div class="node-metric"><span class="node-metric-label">Time</span><span class="node-metric-value">0.37s (14.0%)</span></div>
+          <div class="node-metric"><span class="node-metric-label">Join Key</span><span class="node-metric-value">CreateUID = DatabaseId</span></div>
+        </div>
+        <div class="time-bar-wrap"><div class="time-bar-bg"><div class="time-bar-fill critical" style="width:14%"></div></div><div class="time-pct">14.0% of total</div></div>
+        <div class="tooltip">
+          <strong>Purpose:</strong> Enrich column records with the database name of the CREATOR (CreateUID). Spool 2 = DBC.dbase lookup.<br><br>
+          <strong>Non-match condition:</strong> "NOT (CreateUID IS NULL)" — handles columns where creator is unknown.<br><br>
+          <strong>Single partition hash join:</strong> Optimizer chose single-partition join, meaning Spool 2 (200 rows) fits entirely in memory as build side.<br><br>
+          <strong>🔴 No Confidence:</strong> Propagated from upstream. Spool 2 itself has High Confidence (200 rows), so join selectivity is the unknown.<br><br>
+          <strong>Optimization note:</strong> This join is inherent to the COLUMNSV view definition — cannot be eliminated without rewriting the view.
+        </div>
+      </div>
+
+      <div class="flow-arrow"><div class="arrow-line"></div><div class="arrow-spool">Spool 2 + Spool 13 → Spool 16 — Join on LastAlterUID=DatabaseId</div><div class="arrow-head"></div></div>
+
+      <!-- Step 7 -->
+      <div class="flow-node critical" data-step="7" data-type="join" data-time="0.37">
+        <div class="node-header">
+          <div class="node-step">Step 7</div>
+          <div class="node-type">[HASH-J RIGHT-OUTER]</div>
+          <div class="confidence-badge none">NONE</div>
+        </div>
+        <div class="node-title">Hash Join: Spool 2 ⟕ Spool 13 → Spool 16 (LastAlter DB lookup)</div>
+        <div class="node-metrics">
+          <div class="node-metric"><span class="node-metric-label">Rows Out</span><span class="node-metric-value">27,849</span></div>
+          <div class="node-metric"><span class="node-metric-label">Size</span><span class="node-metric-value">~352 MB</span></div>
+          <div class="node-metric"><span class="node-metric-label">Time</span><span class="node-metric-value">0.37s (14.0%)</span></div>
+          <div class="node-metric"><span class="node-metric-label">Join Key</span><span class="node-metric-value">LastAlterUID = DatabaseId</span></div>
+        </div>
+        <div class="time-bar-wrap"><div class="time-bar-bg"><div class="time-bar-fill critical" style="width:14%"></div></div><div class="time-pct">14.0% of total</div></div>
+        <div class="tooltip">
+          <strong>Purpose:</strong> Enrich with the database name of the LAST MODIFIER (LastAlterUID). Mirror of Step 6 for the alter-user attribute.<br><br>
+          <strong>Pattern:</strong> COLUMNSV resolves both CreateUID and LastAlterUID back to database names via two separate lookups into DBC.dbase.<br><br>
+          <strong>Reuse:</strong> Spool 2 (DBC.dbase, 200 rows) is reused here — optimizer correctly avoids re-reading the table.<br><br>
+          <strong>🔴 No Confidence:</strong> Cascaded from upstream. Actual result likely same 27,849 rows (no filtering here).<br><br>
+          <strong>This step is inherent to the view</strong> — cannot be avoided when selecting CreateorName/LastAlterName columns.
+        </div>
+      </div>
+
+      <div class="flow-arrow"><div class="arrow-line"></div><div class="arrow-spool">Step 8 & 9 run before merging — see parallel below</div><div class="arrow-head"></div></div>
+
+      <!-- Step 8 & 9 note — sequential but logically prep for 10 & 11 -->
+      <div class="parallel-row">
+        <div class="flow-node good" data-step="8" data-type="retrieve" data-time="0.01">
+          <div class="node-header">
+            <div class="node-step">Step 8</div>
+            <div class="node-type">[ALL-AMP]</div>
+            <div class="confidence-badge high">HIGH</div>
+          </div>
+          <div class="node-title">Retrieve DBC.tvf2 (ARRAYELEMENT) → Spool 19</div>
+          <div class="node-metrics">
+            <div class="node-metric"><span class="node-metric-label">Rows</span><span class="node-metric-value">20</span></div>
+            <div class="node-metric"><span class="node-metric-label">Size</span><span class="node-metric-value">2.2 KB</span></div>
+            <div class="node-metric"><span class="node-metric-label">Time</span><span class="node-metric-value">0.01s</span></div>
+            <div class="node-metric"><span class="node-metric-label">Filter</span><span class="node-metric-value">FieldName='ARRAYELEMENT'</span></div>
+          </div>
+          <div class="tooltip">
+            <strong>Purpose:</strong> Retrieve array element type definitions from DBC.tvf2 filtered to ARRAYELEMENT type. Broadcast to all AMPs.<br><br>
+            <strong>✅ High Confidence + Fast:</strong> 20 rows, well-known size, duplicated efficiently.<br><br>
+            <strong>Usage:</strong> This spool feeds Step 10 — the product join for array column type resolution.<br><br>
+            <strong>Note:</strong> Array column support in Teradata requires this lookup to resolve UDT array element types.
+          </div>
+        </div>
+
+        <div class="flow-node warning" data-step="9" data-type="join" data-time="0.01">
+          <div class="node-header">
+            <div class="node-step">Step 9</div>
+            <div class="node-type">[DYN-J REDIST]</div>
+            <div class="confidence-badge low">LOW</div>
+          </div>
+          <div class="node-title">Dynamic Hash Join: Spool 2 ⋈ DBC.TVM → Spool 20</div>
+          <div class="node-metrics">
+            <div class="node-metric"><span class="node-metric-label">Rows Out</span><span class="node-metric-value">3,025</span></div>
+            <div class="node-metric"><span class="node-metric-label">Size</span><span class="node-metric-value">~584 KB</span></div>
+            <div class="node-metric"><span class="node-metric-label">Time</span><span class="node-metric-value">0.01s</span></div>
+            <div class="node-metric"><span class="node-metric-label">Redist by</span><span class="node-metric-value">TVMId hash</span></div>
+          </div>
+          <div class="tooltip">
+            <strong>Purpose:</strong> Join DBC.dbase (Spool 2) to DBC.TVM (table-view mapping) to build a table name lookup.<br><br>
+            <strong>⚠ Low Confidence:</strong> DBC.TVM statistics may be partial. 3,025 rows estimated for tables/views in your system.<br><br>
+            <strong>Redistribution:</strong> Output redistributed by TVMId hash for efficient joining in Step 11.<br><br>
+            <strong>Dynamic hash join:</strong> Optimizer adapts join strategy based on actual intermediate sizes.<br><br>
+            <strong>✅ Fast:</strong> Only 0.01s — well within acceptable range.
+          </div>
+        </div>
+      </div>
+
+      <div class="flow-arrow"><div class="arrow-line"></div><div class="arrow-spool">Spool 16 + Spool 19 → Spool 21</div><div class="arrow-head"></div></div>
+
+      <!-- Step 10 — PRODUCT JOIN -->
+      <div class="flow-node critical" data-step="10" data-type="product-join" data-time="0.50">
+        <div class="node-header">
+          <div class="node-step">Step 10</div>
+          <div class="node-type">[PROD-J LEFT-OUTER]</div>
+          <div class="confidence-badge none">NONE</div>
+        </div>
+        <div class="node-title">⚠ Product Join: Spool 16 ⟗ Spool 19 → Spool 21</div>
+        <div class="node-metrics">
+          <div class="node-metric"><span class="node-metric-label">Rows Out</span><span class="node-metric-value">27,850</span></div>
+          <div class="node-metric"><span class="node-metric-label">Size</span><span class="node-metric-value">~354 MB</span></div>
+          <div class="node-metric"><span class="node-metric-label">Time</span><span class="node-metric-value">0.50s (18.9%)</span></div>
+          <div class="node-metric"><span class="node-metric-label">Join Cond</span><span class="node-metric-value">UDTypeId = TableId</span></div>
+        </div>
+        <div class="time-bar-wrap"><div class="time-bar-bg"><div class="time-bar-fill critical" style="width:18.9%"></div></div><div class="time-pct">18.9% of total — 2nd most expensive</div></div>
+        <span class="product-join-badge">🔴 PRODUCT JOIN DETECTED — Critical Issue</span>
+        <div class="tooltip">
+          <strong>⚠ PRODUCT JOIN:</strong> A Cartesian-style join between Spool 16 (27,849 rows) and Spool 19 (20 rows).<br><br>
+          <strong>Why Product Join?</strong> Condition only applies to non-matching rows: "(FieldType IN ('A1','AN')) AND (UDTypeId NOT NULL)". Optimizer must cross-scan Spool 19 (tiny) against Spool 16 to resolve array type names.<br><br>
+          <strong>Left outer:</strong> All 27,849 rows from Spool 16 are preserved; Spool 19 enriches only array-type columns.<br><br>
+          <strong>Risk:</strong> If Spool 19 grows significantly, this becomes a serious bottleneck. Currently Spool 19 = 20 rows, keeping it manageable.<br><br>
+          <strong>Why it exists:</strong> COLUMNSV resolves array element type names (UDT arrays) — requires this conditional lookup pattern.<br><br>
+          <strong>Can it be fixed?</strong> Not without rewriting DBC.COLUMNSV view definition — this is inherent to the system view design.
+        </div>
+      </div>
+
+      <div class="flow-arrow"><div class="arrow-line"></div><div class="arrow-spool">Spool 20 (3,025 rows) + Spool 21 → Spool 22</div><div class="arrow-head"></div></div>
+
+      <!-- Step 11 -->
+      <div class="flow-node critical" data-step="11" data-type="join" data-time="0.38">
+        <div class="node-header">
+          <div class="node-step">Step 11</div>
+          <div class="node-type">[HASH-J INNER]</div>
+          <div class="confidence-badge none">NONE</div>
+        </div>
+        <div class="node-title">Hash Join: Spool 20 ⋈ Spool 21 → Spool 22 (Table name resolution)</div>
+        <div class="node-metrics">
+          <div class="node-metric"><span class="node-metric-label">Rows Out</span><span class="node-metric-value">27,850</span></div>
+          <div class="node-metric"><span class="node-metric-label">Size</span><span class="node-metric-value">~359 MB</span></div>
+          <div class="node-metric"><span class="node-metric-label">Time</span><span class="node-metric-value">0.38s (14.4%)</span></div>
+          <div class="node-metric"><span class="node-metric-label">Join Key</span><span class="node-metric-value">TVMId = TableId</span></div>
+        </div>
+        <div class="time-bar-wrap"><div class="time-bar-bg"><div class="time-bar-fill critical" style="width:14.4%"></div></div><div class="time-pct">14.4% of total</div></div>
+        <div class="tooltip">
+          <strong>Purpose:</strong> Join the table-name spool (Spool 20, 3,025 tables) against the enriched column data (Spool 21) to resolve TableName for each column.<br><br>
+          <strong>Single partition hash join:</strong> Both spools are pre-partitioned, enabling efficient single-pass hash join.<br><br>
+          <strong>🔴 No Confidence:</strong> 27,850 rows estimated — actual number depends on how many columns exist per table on your system.<br><br>
+          <strong>Practical note:</strong> This join is the "resolve table name" phase of COLUMNSV — every column record gets its parent table name attached here.
+        </div>
+      </div>
+
+      <div class="flow-arrow"><div class="arrow-line"></div><div class="arrow-spool">Spool 23 (DBC.udt1, 76 rows) + Spool 22 → Spool 1</div><div class="arrow-head"></div></div>
+
+      <!-- Step 12 -->
+      <div class="flow-node good" data-step="12" data-type="retrieve" data-time="0">
+        <div class="node-header">
+          <div class="node-step">Step 12</div>
+          <div class="node-type">[ALL-AMP]</div>
+          <div class="confidence-badge high">HIGH</div>
+        </div>
+        <div class="node-title">Retrieve DBC.udt1 (UDT types) → Spool 23</div>
+        <div class="node-metrics">
+          <div class="node-metric"><span class="node-metric-label">Rows</span><span class="node-metric-value">76</span></div>
+          <div class="node-metric"><span class="node-metric-label">Size</span><span class="node-metric-value">83 KB</span></div>
+          <div class="node-metric"><span class="node-metric-label">Time</span><span class="node-metric-value">~0.00s</span></div>
+          <div class="node-metric"><span class="node-metric-label">Method</span><span class="node-metric-value">Dup all AMPs</span></div>
+        </div>
+        <div class="tooltip">
+          <strong>Purpose:</strong> Read UDT (User Defined Type) definitions from DBC.udt1 and broadcast to all AMPs.<br><br>
+          <strong>✅ High Confidence:</strong> 76 rows — well-known size with good statistics.<br><br>
+          <strong>Usage:</strong> Feeds Step 13 product join for UDT column type name resolution.<br><br>
+          <strong>Note:</strong> 76 UDT types registered in your system's data dictionary.
+        </div>
+      </div>
+
+      <div class="flow-arrow"><div class="arrow-line"></div><div class="arrow-spool">Spool 22 (27,850 rows) + Spool 23 (76 rows) → Spool 1 [FINAL]</div><div class="arrow-head"></div></div>
+
+      <!-- Step 13 — PRODUCT JOIN -->
+      <div class="flow-node critical" data-step="13" data-type="product-join" data-time="0.54">
+        <div class="node-header">
+          <div class="node-step">Step 13</div>
+          <div class="node-type">[PROD-J LEFT-OUTER]</div>
+          <div class="confidence-badge none">NONE</div>
+        </div>
+        <div class="node-title">⚠ Product Join: Spool 22 ⟗ Spool 23 → Spool 1 (group_amps)</div>
+        <div class="node-metrics">
+          <div class="node-metric"><span class="node-metric-label">Rows Out</span><span class="node-metric-value">27,851</span></div>
+          <div class="node-metric"><span class="node-metric-label">Size</span><span class="node-metric-value">~597 MB</span></div>
+          <div class="node-metric"><span class="node-metric-label">Time</span><span class="node-metric-value">0.54s (20.5%)</span></div>
+          <div class="node-metric"><span class="node-metric-label">Output</span><span class="node-metric-value">group_amps ⚠</span></div>
+        </div>
+        <div class="time-bar-wrap"><div class="time-bar-bg"><div class="time-bar-fill critical" style="width:20.5%"></div></div><div class="time-pct">20.5% of total — MOST EXPENSIVE STEP</div></div>
+        <span class="product-join-badge">🔴 PRODUCT JOIN — Most Expensive Step + group_amps Skew Risk</span>
+        <div class="tooltip">
+          <strong>⚠ PRODUCT JOIN #2 — MOST EXPENSIVE STEP:</strong> Cross-scan of 27,850 column records against 76 UDT type definitions.<br><br>
+          <strong>Purpose:</strong> Resolve UDT type names for columns with FieldType IN ('A1','AN') and UDTypeId NOT NULL.<br><br>
+          <strong>Left outer:</strong> All 27,850 column rows preserved; 76 UDT rows only enriched for array/UDT columns.<br><br>
+          <strong>🔴 group_amps:</strong> Output goes to Spool 1 on a SUBSET of AMPs (not all AMPs). This is a skew risk — uneven AMP distribution could cause bottleneck on specific AMPs.<br><br>
+          <strong>597 MB final spool:</strong> This is the full COLUMNSV result set — SELECT * pulls ALL columns of the view.<br><br>
+          <strong>Key insight:</strong> The same pattern as Step 10 but operating on UDT types. Both product joins exist to conditionally resolve type names only for specific column types.<br><br>
+          <strong>Mitigation:</strong> The product join is manageable ONLY because Spool 23 is small (76 rows). The view definition cannot be changed.
+        </div>
+      </div>
+
+      <div class="flow-arrow"><div class="arrow-line"></div><div class="arrow-head"></div></div>
+
+      <!-- Output -->
+      <div class="flow-node info" data-step="output">
+        <div class="node-header">
+          <div class="node-step">Output</div>
+          <div class="node-type">[RESULT SET]</div>
+          <div class="confidence-badge n-a">FINAL</div>
+        </div>
+        <div class="node-title">Send Spool 1 to Client</div>
+        <div class="node-metrics">
+          <div class="node-metric"><span class="node-metric-label">Rows</span><span class="node-metric-value">27,851</span></div>
+          <div class="node-metric"><span class="node-metric-label">Spool</span><span class="node-metric-value">~597 MB</span></div>
+          <div class="node-metric"><span class="node-metric-label">Total Time</span><span class="node-metric-value">2.64 seconds</span></div>
+        </div>
+        <div class="tooltip">
+          <strong>Estimated result:</strong> ~27,851 rows sent back to the requesting session.<br><br>
+          <strong>⚠ SELECT * caveat:</strong> All columns of COLUMNSV are returned — including many rarely-needed metadata columns. This explains the 597 MB spool size.<br><br>
+          <strong>Recommendation:</strong> Use <code>SELECT specific_columns FROM DBC.COLUMNSV WHERE DatabaseName='your_db'</code> to dramatically reduce spool and execution time.
+        </div>
+      </div>
+
+    </div><!-- flow-container -->
+  </div><!-- flow-diagram -->
+
+  <!-- Insights -->
+  <div class="section-header">Performance Insights</div>
+  <div class="insights-grid">
+    <div class="insight-card">
+      <h3>🔥 Critical Path (by time)</h3>
+      <div class="insight-item"><span class="insight-rank">1</span><div><strong>Step 13</strong> — Product Join (UDT resolution)<br><small>0.54s — 20.5% of total</small></div></div>
+      <div class="insight-item"><span class="insight-rank">2</span><div><strong>Step 10</strong> — Product Join (Array resolution)<br><small>0.50s — 18.9% of total</small></div></div>
+      <div class="insight-item"><span class="insight-rank">3</span><div><strong>Step 11</strong> — Hash Join (Table name resolution)<br><small>0.38s — 14.4% of total</small></div></div>
+      <div class="insight-item"><span class="insight-rank">4</span><div><strong>Step 6</strong> — Hash Join (Creator DB lookup)<br><small>0.37s — 14.0% of total</small></div></div>
+      <div class="insight-item"><span class="insight-rank">5</span><div><strong>Step 7</strong> — Hash Join (LastAlter DB lookup)<br><small>0.37s — 14.0% of total</small></div></div>
+    </div>
+    <div class="insight-card">
+      <h3>📊 Data Growth Through Pipeline</h3>
+      <div class="insight-item"><span class="insight-rank">➔</span><div>Parallel retrieval (Steps 3.1–3.3): <strong>~40 KB</strong></div></div>
+      <div class="insight-item"><span class="insight-rank">➔</span><div>After Step 4 (tvfields join): <strong>~347 MB</strong> (massive growth)</div></div>
+      <div class="insight-item"><span class="insight-rank">➔</span><div>Steps 5–7 (enrichment joins): <strong>~349–352 MB</strong></div></div>
+      <div class="insight-item"><span class="insight-rank">➔</span><div>Step 10 (product join #1): <strong>~354 MB</strong></div></div>
+      <div class="insight-item"><span class="insight-rank">➔</span><div>Step 13 (product join #2 — FINAL): <strong>~597 MB</strong> 🔺 peak</div></div>
+    </div>
+  </div>
+
+  <!-- Recommendations -->
+  <div class="rec-section">
+    <div class="section-header" style="margin-top:30px">Optimization Recommendations</div>
+
+    <div class="rec-card critical">
+      <div class="rec-title">🔴 HIGH PRIORITY: Avoid SELECT * — Filter by Database and Columns</div>
+      <div class="rec-body">
+        <span class="tag critical">Impact: Major</span><span class="tag info">Effort: Low</span><br><br>
+        <code>SELECT * FROM DBC.COLUMNSV</code> retrieves <strong>all columns across all 27,851 column definitions</strong> in the data dictionary — resulting in a 597 MB spool. In most cases you only need columns for a specific database or table.<br><br>
+        Add a WHERE filter and select only needed columns:
+        <pre class="sql-snippet">-- Instead of this:
+SELECT * FROM DBC.COLUMNSV;
+
+-- Do this (filter by database):
+SELECT DatabaseName, TableName, ColumnName, ColumnType, 
+       ColumnLength, Nullable, DefaultValue
+FROM DBC.COLUMNSV
+WHERE DatabaseName = 'YOUR_DATABASE_NAME'
+ORDER BY TableName, ColumnId;</pre>
+        <strong>Expected impact:</strong> 80–95% reduction in spool size and execution time depending on database size.
+      </div>
+    </div>
+
+    <div class="rec-card critical">
+      <div class="rec-title">🔴 HIGH PRIORITY: Understand the 2 Product Joins (Steps 10 & 13)</div>
+      <div class="rec-body">
+        <span class="tag critical">Steps: 10, 13</span><span class="tag critical">Impact: Architecture</span><br><br>
+        Two product joins exist in this plan — these are <strong>by design within the DBC.COLUMNSV view definition</strong>. They exist to conditionally resolve UDT array element type names only for columns with FieldType IN ('A1','AN').<br><br>
+        <strong>Why product joins?</strong> The join condition only applies to a subset of rows, requiring a Cartesian scan of the lookup table (Spool 19 = 20 rows, Spool 23 = 76 rows) against the main dataset. Since both lookup tables are tiny, the product join is <em>currently manageable</em>.<br><br>
+        <strong>Risk:</strong> If your system has many UDT types or array columns, these steps will grow. Monitor if execution time increases.<br><br>
+        <strong>Workaround:</strong> If you don't need UDT/array column type resolution, consider using DBC.COLUMNS (base table) instead of DBC.COLUMNSV:
+        <pre class="sql-snippet">-- Use base table for simpler queries (no product joins):
+SELECT DatabaseName, TableName, ColumnName, ColumnType
+FROM DBC.COLUMNS
+WHERE DatabaseName = 'YOUR_DB';</pre>
+      </div>
+    </div>
+
+    <div class="rec-card warning">
+      <div class="rec-title">⚠ MEDIUM PRIORITY: group_amps in Step 13 — Potential Skew</div>
+      <div class="rec-body">
+        <span class="tag warning">Step: 13</span><span class="tag warning">Impact: Moderate</span><br><br>
+        The final result (Spool 1) is built in <code>(group_amps)</code> mode — meaning only a <strong>subset of AMPs</strong> holds the final data. This can cause uneven AMP load if those AMPs are already busy.<br><br>
+        <strong>This is a consequence of the product join</strong> — the optimizer builds locally on AMPs that have data, rather than redistributing. Monitor AMP skew if this query runs frequently or concurrently.<br><br>
+        <strong>Mitigation:</strong> Adding a WHERE filter (recommendation #1) will drastically reduce the result set and AMP pressure.
+      </div>
+    </div>
+
+    <div class="rec-card warning">
+      <div class="rec-title">⚠ MEDIUM PRIORITY: 8 Steps with No-Confidence Estimates</div>
+      <div class="rec-body">
+        <span class="tag warning">Steps: 3.3, 4, 5, 6, 7, 10, 11, 13</span><span class="tag info">Impact: Plan Quality</span><br><br>
+        Most join steps show <strong>No Confidence</strong> — the optimizer cannot reliably estimate intermediate row counts. This means the execution plan may not be optimal for your actual data.<br><br>
+        <strong>Why?</strong> DBC.* system tables are internal — you cannot directly collect user-level statistics on them. The no-confidence ratings are expected for system dictionary views.<br><br>
+        <strong>Impact:</strong> Currently limited because the 2.64s estimate is reasonable. The no-confidence cascades from DBC.OU (Step 3.3) having no stats.<br><br>
+        <strong>Action:</strong> No direct user action possible for DBC stats. Focus on adding WHERE predicates to reduce working data sets.
+      </div>
+    </div>
+
+    <div class="rec-card info">
+      <div class="rec-title">💡 LOW PRIORITY: Consider DBC.COLUMNS vs DBC.COLUMNSV</div>
+      <div class="rec-body">
+        <span class="tag info">Impact: Minor</span><span class="tag info">Effort: Low</span><br><br>
+        <strong>DBC.COLUMNSV</strong> is a view that enriches DBC.COLUMNS with human-readable names (database names, table names, UDT type names). This requires 13 steps and ~2.64s even without data filtering.<br><br>
+        <strong>DBC.COLUMNS</strong> is the underlying base table — faster access for analytical queries that don't need the enriched name columns.<br><br>
+        Use COLUMNSV when you need: TableName, DatabaseName, ColumnType (as text), CreatorName, LastAlterName.<br>
+        Use DBC.COLUMNS when you need: Raw IDs (TableId, DatabaseId) for joining to your own metadata.
+      </div>
+    </div>
+
+  </div><!-- rec-section -->
+
+</div><!-- container -->
+
+<script>
+function highlightCriticalPath() {
+  const criticalSteps = ['6','7','10','11','13'];
+  document.querySelectorAll('.flow-node').forEach(node => {
+    const step = node.getAttribute('data-step');
+    if (criticalSteps.some(s => step && step.startsWith(s) && step === s)) {
+      node.classList.add('highlighted');
+      node.classList.remove('dimmed');
+    } else {
+      node.classList.add('dimmed');
+      node.classList.remove('highlighted');
+    }
+  });
+}
+function highlightProductJoins() {
+  document.querySelectorAll('.flow-node').forEach(node => {
+    const type = node.getAttribute('data-type');
+    if (type === 'product-join') {
+      node.classList.add('highlighted');
+      node.classList.remove('dimmed');
+    } else {
+      node.classList.add('dimmed');
+      node.classList.remove('highlighted');
+    }
+  });
+}
+function highlightNoConf() {
+  const noconfSteps = ['3.3','4','5','6','7','10','11','13'];
+  document.querySelectorAll('.flow-node').forEach(node => {
+    const step = node.getAttribute('data-step');
+    if (noconfSteps.includes(step)) {
+      node.classList.add('highlighted');
+      node.classList.remove('dimmed');
+    } else {
+      node.classList.add('dimmed');
+      node.classList.remove('highlighted');
+    }
+  });
+}
+function resetHighlights() {
+  document.querySelectorAll('.flow-node').forEach(node => {
+    node.classList.remove('highlighted','dimmed');
+  });
+}
+</script>
+</body>
+</html>
